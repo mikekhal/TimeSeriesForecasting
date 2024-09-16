@@ -21,7 +21,7 @@ google = yf.Ticker("GOOGL")
 end_date = datetime.now().strftime('%Y-%m-%d')
 google_hist = google.history(start='2021-01-01', end=end_date)
 
-# Drop unnecessary columns for plotting
+# Select columns for plotting
 google_main = google_hist.drop(['Dividends', 'Stock Splits'], axis=1)
 
 # Plot Closing Prices
@@ -35,7 +35,7 @@ plt.show()
 # Display statistics
 print(google_hist.describe())
 
-# EDA: Distribution with Matplotlib
+# Plotting histograms showing distribution of the features from google.hist data
 fig, axs = plt.subplots(3, 2, figsize=(15, 12), tight_layout=True)
 
 # Close histogram
@@ -66,25 +66,17 @@ moving_avg50 = google_main.Close.rolling(50).mean()
 moving_avg100 = google_main.Close.rolling(100).mean()
 
 plt.figure(figsize=(11, 6))
-plt.title('Closing Prices vs 50MA', fontsize=15)
+plt.title('50 & 100 Days Moving Averages fits of Closing Prices', fontsize=15)
 plt.xlabel('Trading Days', fontsize=11)
-plt.ylabel('Price', fontsize=11)
-plt.plot(google_main.Close, label='Close')
-plt.plot(moving_avg50, 'red', label='50-Day MA')
-plt.legend()
-plt.show()
-
-plt.figure(figsize=(11, 6))
-plt.title('Closing Prices vs 50 & 100 Days Moving Averages', fontsize=15)
-plt.xlabel('Trading Days', fontsize=11)
-plt.ylabel('Price', fontsize=11)
+plt.ylabel('Closing Price', fontsize=11)
 plt.plot(google_main.Close, label='Close')
 plt.plot(moving_avg50, 'red', label='50-Day MA')
 plt.plot(moving_avg100, 'green', label='100-Day MA')
+plt.savefig('wow.png', dpi=300)
 plt.legend()
 plt.show()
 
-# Run Statistical Tests
+# Finding correlation between variables
 correlation = google_hist.corr()
 fig = px.imshow(correlation, text_auto=True, title='Correlation Matrix')
 fig.update_layout(title_text='Correlation Matrix', title_x=0.5, template='plotly_dark')
@@ -94,21 +86,12 @@ fig.write_image('correlation_matrix.png')
 # Statistical Tests
 # T-test comparing 'High' and 'Low' prices
 t_stat, p_value = ttest_ind(google_hist['High'], google_hist['Low'])
-t_test_result = {
-    'Statistic': [t_stat],
-    'p-value': [p_value]
-}
-t_test_df = pd.DataFrame(t_test_result)
-t_test_df
-print(t_test_df)
-# ANOVA used for comparing the means among more groups
+
+print('t-test statistic:', t_stat, 'p-value:', p_value)
+# ANOVA used for comparing the means between more than one variables:
 anova_stat, anova_p_value = f_oneway(google_hist['Open'], google_hist['High'], google_hist['Low'], google_hist['Close'])
-anova_result = {
-    'Statistic': [anova_stat],
-    'p-value': [anova_p_value]
-}
-anova_df = pd.DataFrame(anova_result)
-print(anova_df)
+
+print('ANOVA-test statistic:', anova_stat, 'p-value:', anova_p_value)
 
 # Splitting the dataset into training and testing data
 data_training = pd.DataFrame(google_main['Close'][0: int(len(google_main) * 0.7)])
@@ -131,7 +114,7 @@ x_train, y_train = np.array(x_train), np.array(y_train)
 from tensorflow.keras.layers import Dense, Dropout, LSTM
 from tensorflow.keras.models import Sequential
 
-# Build LSTM model
+# Building LSTM model
 model = Sequential()
 model.add(LSTM(units=50, activation= 'relu' , return_sequences= True, input_shape= (x_train.shape[1],1) ))
 model.add(Dropout(0.2))
@@ -145,7 +128,7 @@ model.add(Dropout(0.4))
 model.add(LSTM(units=120, activation= 'relu'))
 model.add(Dropout(0.5))
           
-model.add(Dense(units=1)) # connect all the layers
+model.add(Dense(units=1))
 
 model.compile(optimizer='adam' , loss='mean_squared_error')
 
@@ -177,9 +160,9 @@ y_predicted.shape
 # scale up the values
 print(scaler.scale_)  # returns the scalability factor
 
-mul_by_fac  = 1 / 0.00978932
-y_test = y_test * mul_by_fac 
-y_predicted = y_predicted * mul_by_fac 
+scale  = 1 / scaler.scale_[0]
+y_test = y_test * scale 
+y_predicted = y_predicted * scale 
 
 # Plot of Original vs Predicted graph
 plt.figure(figsize=(11,6))
@@ -188,5 +171,31 @@ plt.plot(y_test, 'b', label='Original price')
 plt.plot(y_predicted, 'r', label='Predicted price')
 plt.xlabel('Time' , fontsize = 10)
 plt.ylabel('Price', fontsize = 10)
+
+# (100 days of training data)
+plt.axvline(x=100, color='g', linestyle='--', label='Start of Testing Data')
+
+# Annotating the graph to show each section
+plt.text(20, y_test.max(), 'Last 100 Days of Training Data', fontsize=10, color='green', verticalalignment='center')
+plt.text(120, y_test.max(), 'Testing Data', fontsize=10, color='green', verticalalignment='center')
+
 plt.legend()
+plt.savefig('prediction',dpi=300)
 plt.show()
+
+# Adding Financial Metrics
+def calculate_financial_ratios(ticker):
+    info = ticker.info
+    pe_ratio = info.get('forwardEps', None) and info.get('forwardEps', None) / info.get('currentPrice', None)
+    pb_ratio = info.get('priceToBook', None)
+    roe = info.get('returnOnEquity', None)
+    
+    ratios = {
+        'P/E Ratio': pe_ratio,
+        'P/B Ratio': pb_ratio,
+        'ROE': roe
+    }
+    return ratios
+
+ratios = calculate_financial_ratios(google)
+print("Financial Ratios:\n", ratios)
